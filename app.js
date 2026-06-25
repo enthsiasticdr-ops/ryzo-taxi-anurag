@@ -1103,9 +1103,9 @@ const RyzoApp = {
       return;
     }
 
-    // Friction Layers: check wallet balance and strikes first
+    // Friction Layers: check wallet balance and strikes first (requires balance >= 0)
     const walletBalance = parseFloat(this.state.currentUser.wallet_balance || 0);
-    if (walletBalance < 20) {
+    if (walletBalance < 0) {
       this.showToast('Insufficient balance. Please load your wallet.');
       this.showLoadWalletModal();
       return;
