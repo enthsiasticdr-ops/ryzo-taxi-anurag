@@ -1,0 +1,13 @@
+# Gemini & IDE directories
+.gemini/
+.idea/
+.vscode/
+
+# Local Node modules
+node_modules/
+npm-debug.log*
+
+# System & OS Files
+.DS_Store
+Thumbs.db
+desktop.ini

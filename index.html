@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ryzo - Local Ride-Sharing & Logistics</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#FF003C">
+  
+  <!-- Leaflet Map CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- Fuse.js Fuzzy Search Library -->
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
+  
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then((reg) => console.log('[Service Worker] Registered', reg))
+          .catch((err) => console.error('[Service Worker] Registration failed', err));
+      });
+    }
+  </script>
+</head>
+<body>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container">
+    <div class="toast">
+      <span id="toast-message">Notification Message</span>
+      <button class="btn-tactile" onclick="RyzoApp.hideToast()" style="background:transparent; border:none; color:var(--accent-cyan); font-size:1.2rem; cursor:pointer;">&times;</button>
+    </div>
+  </div>
+
+  <!-- Global Loader -->
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- App Wrapper constrained to mobile viewports (360px - 480px) -->
+  <div class="app-container">
+
+    <!-- ==========================================
+         VIEW 1: LANDING VIEW
+         ========================================== -->
+    <div id="view-landing" class="fade-in" data-view="landing">
+      <div style="padding: 40px 24px; text-align: center; display: flex; flex-direction: column; height: 100%; justify-content: space-between;">
+        
+        <!-- Brand & Logo -->
+        <div style="margin-top: 40px;">
+          <h1 class="logo-text" style="font-size: 2.8rem; margin-bottom: 8px;">RYZO</h1>
+          <p style="letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.75rem; color: var(--accent-cyan);">Real-Time Bike Taxi Platform</p>
+        </div>
+
+        <!-- Choice Cards Grid -->
+        <div style="display: flex; flex-direction: column; gap: 20px; margin: 40px 0;">
+          
+          <!-- Card A: Customer Path -->
+          <div id="btn-choose-customer" class="glass-card btn-tactile" style="cursor: pointer; padding: 24px; text-align: left; border-left: 4px solid var(--accent-cyan); display: flex; align-items: center; gap: 16px;">
+            <div style="background: rgba(0, 240, 255, 0.1); padding: 12px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <!-- Bike SVG -->
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 32px; height: 32px; stroke: var(--accent-cyan);">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.61 3.55a6 6 0 00-5.84 7.38h4.8m5.84 3.44a15.02 15.02 0 00-11.68 11.68m11.68-11.68L9.61 3.55" />
+              </svg>
+            </div>
+            <div>
+              <h3 style="font-size: 1.25rem; font-weight: 700; color: white;">Book Bike Taxi</h3>
+              <p style="margin-top: 4px; color: var(--text-muted); font-size: 0.85rem;">Quick, affordable local bike rides.</p>
+            </div>
+          </div>
+
+          <!-- Card B: Rider Path -->
+          <div id="btn-choose-rider" class="glass-card btn-tactile" style="cursor: pointer; padding: 24px; text-align: left; border-left: 4px solid var(--accent-blue); display: flex; align-items: center; gap: 16px;">
+            <div style="background: rgba(0, 102, 255, 0.1); padding: 12px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <!-- Wallet + Chart SVG -->
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 32px; height: 32px; stroke: var(--accent-blue);">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0018 4.5H6a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 006 19.5z" />
+              </svg>
+            </div>
+            <div>
+              <h3 style="font-size: 1.25rem; font-weight: 700; color: white;">Earn with Ryzo</h3>
+              <p style="margin-top: 4px; color: var(--text-muted); font-size: 0.85rem;">Earn by providing bike rides.</p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Footer terms -->
+        <p style="font-size: 0.65rem; color: var(--text-muted); opacity: 0.8; margin-top: 20px;">
+          By entering Ryzo, you agree to our <a href="#" style="color:var(--accent-cyan); text-decoration:none;">service terms</a> and <a href="#" style="color:var(--accent-cyan); text-decoration:none;">dispatch protocol</a>.
+        </p>
+
+      </div>
+    </div>
+
+
+    <!-- ==========================================
+         VIEW 2: AUTH VIEW (LOGIN / SIGNUP)
+         ========================================== -->
+    <div id="view-auth" class="fade-in hidden" data-view="auth">
+      
+      <!-- Top Sticky Header -->
+      <div class="header-bar">
+        <button id="auth-btn-back" class="btn-tactile" style="background: none; border: none; cursor: pointer; color: white; display: flex; align-items: center; gap: 4px;">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px;">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+          Back
+        </button>
+        <span class="logo-text" style="font-size: 1.2rem;">Authentication</span>
+        <div style="width: 50px;"></div>
+      </div>
+
+      <div style="padding: 20px;">
+        
+        <!-- Auth Tabs: Login vs Signup -->
+        <div style="display: flex; gap: 8px; background: rgba(255, 255, 255, 0.02); padding: 4px; border-radius: 12px; margin-bottom: 24px; border: 1px solid var(--border-light);">
+          <button id="tab-login" class="btn-tactile" style="flex:1; background: var(--card-charcoal); border:none; padding:10px; border-radius:8px; color:white; font-weight:600; cursor:pointer;">Login</button>
+          <button id="tab-signup" class="btn-tactile" style="flex:1; background: transparent; border:none; padding:10px; border-radius:8px; color:var(--text-muted); font-weight:600; cursor:pointer;">Sign Up</button>
+        </div>
+
+        <!-- Role Indicator Text -->
+        <div style="margin-bottom: 20px; text-align: center;">
+          <p style="font-size: 0.85rem; color: var(--text-muted);">Accessing platform as a <strong id="auth-role-badge" style="color: var(--accent-cyan);">CUSTOMER</strong></p>
+        </div>
+
+        <!-- Auth Form Container -->
+        <form id="auth-form" class="glass-card" autocomplete="off" onsubmit="event.preventDefault();">
+          
+          <!-- Common Fields -->
+          <div class="input-group">
+            <label class="input-label" for="auth-email">Email Address</label>
+            <input type="email" id="auth-email" class="input-control" placeholder="name@domain.com" required>
+          </div>
+
+          <div class="input-group">
+            <label class="input-label" for="auth-password">Password</label>
+            <input type="password" id="auth-password" class="input-control" placeholder="••••••••" required>
+          </div>
+
+          <!-- SIGNUP ONLY Fields -->
+          <div id="signup-fields" class="hidden">
+            
+            <div class="input-group">
+              <label class="input-label" for="auth-name">Full Name</label>
+              <input type="text" id="auth-name" class="input-control" placeholder="Enter your full name">
+            </div>
+
+            <div class="input-group">
+              <label class="input-label" for="auth-phone">Mobile Phone</label>
+              <input type="tel" id="auth-phone" class="input-control" placeholder="e.g. +91 98765 43210">
+            </div>
+
+            <!-- Rider Specific Fields -->
+            <div id="rider-signup-fields" class="hidden" style="border-top: 1px dashed var(--border-light); margin-top: 16px; padding-top: 16px;">
+              
+              <div class="input-group">
+                <label class="input-label" for="auth-vehicle-type">Vehicle Type</label>
+                <select id="auth-vehicle-type" class="input-control" onchange="RyzoApp.handleVehicleTypeChange(this.value)" style="background: var(--card-charcoal); color: white; border: 1px solid var(--border-light); border-radius: 8px; padding: 10px; width: 100%;">
+                  <option value="motorbike">Motorbike</option>
+                  <option value="bicycle">Bicycle</option>
+                </select>
+              </div>
+
+              <div class="input-group">
+                <label class="input-label" for="auth-bike-reg">Bike Registration Number</label>
+                <input type="text" id="auth-bike-reg" class="input-control" placeholder="e.g. KA-01-EF-1234">
+              </div>
+
+              <div class="input-group">
+                <label class="input-label" for="auth-license-num">Driving License Number</label>
+                <input type="text" id="auth-license-num" class="input-control" placeholder="e.g. DL-1420110012345">
+              </div>
+
+              <!-- Aadhaar Photo Upload -->
+              <div class="input-group">
+                <label class="input-label">Aadhaar Card Photograph</label>
+                <div class="file-upload-wrapper" id="upload-aadhaar-box">
+                  <span id="aadhaar-label-text" style="color: var(--text-muted); font-size: 0.85rem;">Tap to choose Aadhaar Card image</span>
+                  <input type="file" id="auth-aadhaar-file" accept="image/*">
+                  <img id="aadhaar-preview" class="file-preview hidden" src="" alt="Aadhaar Preview">
+                </div>
+              </div>
+
+              <!-- License Photo Upload -->
+              <div class="input-group">
+                <label class="input-label">Driving License Photograph</label>
+                <div class="file-upload-wrapper" id="upload-license-box">
+                  <span id="license-label-text" style="color: var(--text-muted); font-size: 0.85rem;">Tap to choose Driving License image</span>
+                  <input type="file" id="auth-license-file" accept="image/*">
+                  <img id="license-preview" class="file-preview hidden" src="" alt="License Preview">
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <button id="auth-submit-btn" type="submit" class="btn-primary btn-tactile" style="margin-top: 10px;">
+            <span id="auth-btn-text">Log In</span>
+          </button>
+
+        </form>
+
+      </div>
+    </div>
+
+
+    <!-- ==========================================
+         VIEW 3: CUSTOMER DASHBOARD
+         ========================================== -->
+    <div id="view-customer" class="fade-in hidden" data-view="customer">
+      
+      <!-- Customer Sticky Header -->
+      <div class="header-bar">
+        <div style="display: flex; flex-direction: column;">
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Welcome, Customer</span>
+          <span id="customer-profile-name" style="font-weight: 700; font-size: 0.95rem;">Customer Name</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div id="customer-wallet-badge-container" style="background: rgba(0, 240, 255, 0.08); border: 1px solid var(--accent-cyan); padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; color: white; display: flex; align-items: center; gap: 4px; box-shadow: 0 0 8px rgba(0, 240, 255, 0.2);">
+            <span style="opacity: 0.7;">Wallet:</span>
+            <span id="customer-wallet-balance" style="color: var(--accent-cyan);">₹0.00</span>
+          </div>
+          <button id="customer-btn-load-wallet" class="btn-tactile" onclick="RyzoApp.showLoadWalletModal()" style="background: rgba(0, 240, 255, 0.15); border: 1px solid var(--accent-cyan); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; color: white; cursor: pointer; border: 1px solid var(--accent-cyan); display: flex; align-items: center; gap: 4px; transition: all 0.2s;">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 12px; height: 12px; stroke: var(--accent-cyan);">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Load
+          </button>
+          <button id="customer-btn-help" class="btn-tactile" onclick="RyzoApp.showHelpModal()" style="background: none; border: none; cursor: pointer; color: var(--accent-cyan); font-size: 0.85rem; font-weight: 600; display:flex; align-items:center; gap:4px;">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor" style="width: 18px; height: 18px;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+            </svg>
+            Help
+          </button>
+          <button id="customer-btn-logout" class="btn-tactile" style="background: none; border: none; cursor: pointer; color: var(--alert-magenta); font-size: 0.85rem; font-weight: 600; display:flex; align-items:center; gap:4px;">
+            Logout
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 16px; height: 16px;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Unified Dashboard Navigation Bar -->
+      <div style="display: flex; gap: 8px; background: rgba(255, 255, 255, 0.02); padding: 4px; border-radius: 12px; margin: 16px 20px 0 20px; border: 1px solid var(--border-light);">
+        <button id="nav-btn-ride" class="btn-tactile" onclick="RyzoApp.switchView('ride')" style="flex:1; background: var(--card-charcoal); border:none; padding:10px; border-radius:8px; color:white; font-weight:600; cursor:pointer;">Book Ride</button>
+        <button id="nav-btn-history" class="btn-tactile" onclick="RyzoApp.switchView('history')" style="flex:1; background: transparent; border:none; padding:10px; border-radius:8px; color:var(--text-muted); font-weight:600; cursor:pointer;">History</button>
+      </div>
+
+      <div style="padding: 20px; padding-bottom: 40px;">
+
+        <!-- 1. RIDE BOOKING SYSTEM CONTAINER -->
+        <div id="ride-view" class="fade-in">
+
+          <!-- Location Entry Details & Intelligent Map -->
+          <div class="glass-card">
+            <h4 style="font-size:0.95rem; margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:16px; height:16px; stroke:var(--accent-cyan);">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25s-7.5-4.108-7.5-11.25S11.5 3.5 11.5 3.5s7 3.13 7 7z" />
+              </svg>
+              Route Vectors & Live Tracker
+            </h4>
+
+            <div class="input-group">
+              <label class="input-label" for="customer-pickup">Pickup Address</label>
+              <select id="customer-pickup" class="input-control" style="background-color: var(--card-charcoal); color: white; border: 1px solid var(--border-light); border-radius: 8px; padding: 10px; width: 100%; font-size: 0.9rem;">
+                <option value="" disabled selected>Ryzo - Select Location</option>
+                <option value="Jandaha">Jandaha</option>
+                <option value="Patoree">Patoree</option>
+                <option value="Hajipur">Hajipur</option>
+                <option value="Mahua">Mahua</option>
+                <option value="Patna">Patna</option>
+                <option value="Local Market">Local Market Trip</option>
+              </select>
+            </div>
+
+            <div class="input-group">
+              <label class="input-label" for="customer-dropoff">Dropoff Address</label>
+              <select id="customer-dropoff" class="input-control" style="background-color: var(--card-charcoal); color: white; border: 1px solid var(--border-light); border-radius: 8px; padding: 10px; width: 100%; font-size: 0.9rem;">
+                <option value="" disabled selected>Ryzo - Select Location</option>
+                <option value="Jandaha">Jandaha</option>
+                <option value="Patoree">Patoree</option>
+                <option value="Hajipur">Hajipur</option>
+                <option value="Mahua">Mahua</option>
+                <option value="Patna">Patna</option>
+                <option value="Local Market">Local Market Trip</option>
+              </select>
+            </div>
+
+            <!-- Dynamic leaflet map element inside Customer View -->
+            <div id="map" style="height: 250px; width: 100%; border-radius: 16px; margin-top: 16px;"></div>
+          </div>
+
+          <!-- Live Fare Calculation Indicator -->
+          <div class="glass-card" style="display:flex; justify-content:space-between; align-items:center; padding: 20px; border-left: 4px solid var(--accent-cyan);">
+            <div>
+              <h4 style="font-size:0.85rem; text-transform:uppercase; color:var(--text-primary); font-weight:700;">Total Booking Fare</h4>
+              <span style="font-size:0.65rem; color:var(--text-muted);">Flat Local Route Fares (Bike Taxi)</span>
+            </div>
+            <div style="text-align:right;">
+              <span id="fare-estimate-display" style="font-size:1.9rem; font-weight:800; color:var(--accent-cyan);">₹0</span>
+            </div>
+          </div>
+
+          <!-- Action Button to Trigger Dispatch -->
+          <button id="customer-btn-dispatch" class="btn-primary btn-tactile" style="margin-bottom: 20px;">
+            Confirm Booking
+          </button>
+
+
+          <!-- Current Ride / Status Dashboard Overlay -->
+          <div id="customer-ride-status-container" class="glass-card glow-blue hidden fade-in" style="margin-top: 10px; border-left: 4px solid var(--accent-blue);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <h4 style="font-size:1rem;">Active Request Status</h4>
+              <span id="customer-ride-badge" class="badge badge-pending">PENDING</span>
+            </div>
+            
+            <div id="customer-ride-details" style="font-size:0.85rem; display:flex; flex-direction:column; gap:6px;">
+              <div><strong style="color:var(--text-muted);">Service:</strong> <span id="cust-ride-service">-</span></div>
+              <div><strong style="color:var(--text-muted);">Pickup:</strong> <span id="cust-ride-pickup">-</span></div>
+              <div><strong style="color:var(--text-muted);">Dropoff:</strong> <span id="cust-ride-dropoff">-</span></div>
+              
+              <div id="cust-ride-otp-box" class="hidden" style="margin-top: 12px; padding: 8px; border-radius: 8px; background: rgba(255, 0, 60, 0.1); border: 1px solid var(--accent-cyan); text-align: center;">
+                <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Ride Verification OTP</span>
+                <h4 id="cust-ride-otp-code" style="font-size:1.4rem; color:var(--accent-cyan); margin-top:2px; letter-spacing:0.15em; font-weight:800;">-</h4>
+              </div>
+
+              <!-- Rider Details (Shown when status is accepted/completed) -->
+              <div id="cust-ride-driver-box" class="hidden" style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--border-light);">
+                <h5 style="font-size:0.85rem; margin-bottom:6px; color:var(--accent-cyan);">Transporter Assigned</h5>
+                <div><strong>Name:</strong> <span id="cust-driver-name">-</span></div>
+                <div><strong>Contact:</strong> <span id="cust-driver-phone">-</span></div>
+                <div><strong>Bike Reg:</strong> <span id="cust-driver-reg">-</span></div>
+                
+                <!-- Live Rider Location ETA box -->
+                <div id="cust-ride-eta-box" class="hidden" style="margin-top:8px; padding:6px; background:rgba(0, 240, 255, 0.1); border: 1px solid rgba(0, 240, 255, 0.3); border-radius:6px; font-size:0.8rem; color:white;"></div>
+              </div>
+            </div>
+            <!-- Customer action buttons container -->
+            <div id="cust-actions-container">
+              <button id="cust-btn-cancel-ride" class="btn-secondary btn-tactile" style="width: 100%; margin-top: 12px; background: rgba(220, 38, 38, 0.15); border: 1px solid rgb(220, 38, 38); color: rgb(248, 113, 113); padding: 10px;">
+                Cancel Ride Request
+              </button>
+            </div>
+          </div>
+
+
+        </div>
+
+
+        <!-- 3. HISTORY SECTION CONTAINER -->
+        <div id="history-view" class="fade-in hidden">
+          <h2 style="font-size: 1.1rem; margin-bottom: 12px; color: var(--text-primary);">Your Transaction & Travel History</h2>
+          <div id="history-list" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+            <div class="glass-card" style="text-align:center; padding: 40px 20px;">
+              <p style="color:var(--text-muted); font-size: 0.85rem;">No history items found.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dashboard Footer -->
+        <div class="dashboard-footer" style="text-align: center; padding: 16px; border-top: 1px solid var(--border-light); margin-top: 24px; font-size: 0.8rem; color: var(--text-muted);">
+          Support: <a href="mailto:supportcareryzo@gmail.com" style="color: var(--accent-cyan); text-decoration: none;">supportcareryzo@gmail.com</a>
+        </div>
+
+      </div>
+    </div>
+
+
+    <!-- ==========================================
+         VIEW 4: RIDER/TRANSPORTER DASHBOARD
+         ========================================== -->
+    <div id="view-rider" class="fade-in hidden" data-view="rider">
+      
+      <!-- Rider Sticky Header -->
+      <div class="header-bar">
+        <div style="display: flex; flex-direction: column;">
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Welcome, Transporter</span>
+          <span id="rider-profile-name" style="font-weight: 700; font-size: 0.95rem;">Rider Name</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <button id="rider-btn-help" class="btn-tactile" onclick="RyzoApp.showHelpModal()" style="background: none; border: none; cursor: pointer; color: var(--accent-cyan); font-size: 0.85rem; font-weight: 600; display:flex; align-items:center; gap:4px;">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor" style="width: 18px; height: 18px;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+            </svg>
+            Help
+          </button>
+          <button id="rider-btn-logout" class="btn-tactile" style="background: none; border: none; cursor: pointer; color: var(--alert-magenta); font-size: 0.85rem; font-weight: 600; display:flex; align-items:center; gap:4px;">
+            Logout
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 16px; height: 16px;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div style="padding: 20px; padding-bottom: 40px;">
+        
+        <!-- Verification Banner (Shown if not verified) -->
+        <div id="rider-verification-alert" class="glass-card glow-magenta hidden" style="background: rgba(255, 0, 122, 0.05); margin-bottom: 16px;">
+          <h4 style="font-size: 0.9rem; color: var(--alert-magenta); margin-bottom: 4px;">Awaiting Verification</h4>
+          <p style="font-size: 0.8rem;">An administrator must verify your Aadhaar and Driving License upload before you can toggle online status.</p>
+        </div>
+
+        <!-- Wallet Status Card with Top-Up Trigger -->
+        <div class="glass-card" style="display:flex; justify-content:space-between; align-items:center; padding: 20px;">
+          <div>
+            <h4 style="font-size:0.8rem; text-transform:uppercase; color:var(--text-muted);">Rider Wallet Balance</h4>
+            <span style="font-size:0.65rem; color:var(--text-muted);">₹5.00 deducted per completed trip</span>
+          </div>
+          <div style="text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+            <span id="rider-wallet-balance" style="font-size:1.8rem; font-weight:800; color:var(--accent-cyan);">₹100.00</span>
+            <button id="rider-btn-topup" class="btn-tactile" style="background:rgba(255, 0, 60, 0.15); border:1px solid var(--accent-cyan); padding:4px 10px; border-radius:6px; font-size:0.75rem; font-weight:700; color:white; cursor:pointer;">Top-Up Wallet</button>
+          </div>
+        </div>
+
+        <!-- Request Withdrawal Form Card -->
+        <div class="glass-card glow-cyan" style="margin-top: 16px; padding: 20px; border-left: 4px solid var(--accent-cyan);">
+          <h4 style="font-size:0.9rem; margin-bottom:12px; color:var(--text-primary); font-weight:700;">Request Withdrawal</h4>
+          <form id="rider-withdrawal-form" onsubmit="event.preventDefault();">
+            <div class="input-group" style="margin-bottom: 12px; position: relative;">
+              <label class="input-label" for="withdrawal-upi">UPI ID</label>
+              <input type="text" id="withdrawal-upi" class="input-control" placeholder="e.g. name@upi" required>
+            </div>
+            <div class="input-group" style="margin-bottom: 12px; position: relative;">
+              <label class="input-label" for="withdrawal-amount">Amount (₹)</label>
+              <input type="number" id="withdrawal-amount" class="input-control" placeholder="e.g. 500" min="1" required>
+            </div>
+            <button type="submit" id="rider-btn-submit-withdrawal" class="btn-primary btn-tactile" style="width: 100%; padding: 10px; font-size: 0.85rem;">
+              Submit Withdrawal Request
+            </button>
+          </form>
+        </div>
+
+
+        <!-- Online / Offline Availability Status Badge -->
+        <div class="switch-container" style="justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span id="rider-status-dot" class="status-indicator status-offline"></span>
+            <div>
+              <h4 style="font-size: 0.9rem;">Duty Status</h4>
+              <p id="rider-status-text" style="font-size: 0.75rem; color: var(--text-muted);">Auto-Offline</p>
+            </div>
+          </div>
+          <!-- Hidden checkbox for backward-compatibility but no longer manual -->
+          <input type="checkbox" id="rider-duty-switch" style="display:none;" disabled>
+        </div>
+
+        <!-- Real-Time Incoming Order Queue Stream -->
+        <div style="margin-top: 24px;">
+          <h3 style="font-size: 1rem; margin-bottom: 12px; color: var(--text-primary); display:flex; justify-content:space-between; align-items:center;">
+            <span>Incoming Dispatch Feed</span>
+            <span id="order-count-badge" class="badge" style="background:rgba(255,255,255,0.03); border:1px solid var(--border-light); color:var(--text-muted);">0 Active</span>
+          </h3>
+
+          <!-- Container where incoming requests are dynamically inserted -->
+          <div id="incoming-order-list" class="fade-in">
+            <!-- Placeholder for Empty State -->
+            <div id="rider-empty-feed" class="glass-card" style="text-align:center; padding: 40px 20px;">
+              <p style="color:var(--text-muted); font-size: 0.85rem;">Toggle Online status to listen to nearby ride requests</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Accepted Order Actions Board -->
+        <div id="rider-accepted-order-panel" class="glass-card glow-cyan hidden" style="margin-top: 20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--border-light);">
+            <h4 id="rider-task-panel-title" style="font-size: 0.95rem; color: var(--accent-cyan);">Active Task Assigned</h4>
+            <span class="badge badge-accepted">IN PROGRESS</span>
+          </div>
+
+          <div style="font-size: 0.85rem; display:flex; flex-direction:column; gap:6px; margin-bottom:16px;">
+            <div><strong>Customer:</strong> <span id="rider-task-customer-name">-</span></div>
+            <div><strong>Phone:</strong> <span id="rider-task-customer-phone">-</span></div>
+            <div id="rider-task-pickup-box"><strong>Pickup:</strong> <span id="rider-task-pickup">-</span></div>
+            <div id="rider-task-dropoff-box"><strong>Dropoff:</strong> <span id="rider-task-dropoff">-</span></div>
+            <div><strong>Total Price / Fare:</strong> <span id="rider-task-fare">-</span></div>
+            <div id="rider-task-extra-box" class="hidden"><strong>Extra Details:</strong> <span id="rider-task-extra">-</span></div>
+            <div id="rider-otp-verification-box" class="input-group hidden" style="margin-top: 12px; border-top: 1px dashed var(--border-light); padding-top: 12px;">
+              <label class="input-label" for="rider-otp-input">Enter Customer Ride OTP</label>
+              <input type="text" inputmode="numeric" pattern="[0-9]*" id="rider-otp-input" class="input-control" placeholder="Enter 4-digit OTP" maxlength="4" style="text-align: center; font-size: 1.2rem; letter-spacing: 0.2em; font-weight: bold; margin-top: 6px;">
+              <p id="rider-verification-status-text" style="font-size:0.75rem; margin-top:6px; color:var(--alert-magenta);">Enter OTP to start verification...</p>
+            </div>
+          </div>
+
+          <!-- Dynamic map for Rider active tracking -->
+          <div id="map-rider" style="height: 220px; width: 100%; border-radius: 16px; margin-bottom: 20px;"></div>
+
+          <button id="rider-btn-complete-trip" class="btn-primary btn-tactile hidden" onclick="RyzoApp.completeActiveRide()">
+            Complete Trip & Collect Cash
+          </button>
+          <!-- Rider action buttons container -->
+          <div id="rider-actions-container">
+            <button id="rider-btn-cancel-task" class="btn-secondary btn-tactile" style="width: 100%; margin-top: 12px; background: rgba(220, 38, 38, 0.15); border: 1px solid rgb(220, 38, 38); color: rgb(248, 113, 113); padding: 10px;">
+              Cancel Task
+            </button>
+          </div>
+        </div>
+
+        <!-- Dashboard Footer -->
+        <div class="dashboard-footer" style="text-align: center; padding: 16px; border-top: 1px solid var(--border-light); margin-top: 24px; font-size: 0.8rem; color: var(--text-muted);">
+          Support: <a href="mailto:supportcareryzo@gmail.com" style="color: var(--accent-cyan); text-decoration: none;">supportcareryzo@gmail.com</a>
+        </div>
+
+      </div>
+    </div>
+
+
+    <!-- ==========================================
+         OVERLAY: OVER-DRAFT UPI LOCKOUT
+         ========================================== -->
+    <div id="lockout-overlay" class="lockout-overlay hidden">
+      <div class="glass-card glow-magenta" style="padding: 24px; max-width: 380px; width: 100%;">
+        <h2 style="color: var(--alert-magenta); font-size: 1.4rem; margin-bottom: 12px;">OVERDRAFT LOCKOUT</h2>
+        <p style="font-size: 0.85rem; margin-bottom: 16px;">Your wallet balance has dropped below the threshold (≤ ₹0.00). You cannot accept dispatcher streams.</p>
+        
+        <div style="background: var(--card-charcoal); padding: 12px; border-radius: 8px; border: 1px solid var(--border-light); margin-bottom: 16px;">
+          <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Current Wallet</span>
+          <h3 id="lockout-wallet-display" style="font-size: 1.6rem; color: var(--alert-magenta); margin-top: 4px;">₹-5.00</h3>
+        </div>
+
+        <p style="font-size: 0.8rem; color: var(--text-muted);">Scan merchant QR code to replenish balance (adds ₹100.00):</p>
+        <div class="qr-code-placeholder" style="margin: 16px auto;">
+          <svg width="100%" height="100%" viewBox="0 0 100 100" fill="black" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100" height="100" fill="white"/>
+            <rect x="10" y="10" width="25" height="25" fill="black"/>
+            <rect x="15" y="15" width="15" height="15" fill="white"/>
+            <rect x="18" y="18" width="9" height="9" fill="black"/>
+            <rect x="65" y="10" width="25" height="25" fill="black"/>
+            <rect x="70" y="15" width="15" height="15" fill="white"/>
+            <rect x="73" y="18" width="9" height="9" fill="black"/>
+            <rect x="10" y="65" width="25" height="25" fill="black"/>
+            <rect x="15" y="70" width="15" height="15" fill="white"/>
+            <rect x="18" y="73" width="9" height="9" fill="black"/>
+            <rect x="42" y="15" width="6" height="6" fill="black"/>
+            <rect x="52" y="25" width="6" height="6" fill="black"/>
+            <rect x="45" y="45" width="12" height="12" fill="black"/>
+            <rect x="15" y="45" width="6" height="8" fill="black"/>
+            <rect x="70" y="45" width="10" height="6" fill="black"/>
+            <rect x="42" y="65" width="6" height="10" fill="black"/>
+            <rect x="65" y="65" width="12" height="6" fill="black"/>
+            <rect x="78" y="75" width="8" height="8" fill="black"/>
+            <rect x="52" y="80" width="8" height="8" fill="black"/>
+          </svg>
+        </div>
+
+        <div style="font-size: 0.8rem; background: var(--card-charcoal); border: 1px solid var(--border-light); padding: 8px; border-radius: 8px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-family: monospace; color:white;">paytm.ryzo@paytm</span>
+          <button id="lockout-btn-copy-upi" class="btn-tactile" style="background:var(--accent-cyan); border:none; padding:4px 8px; border-radius:4px; font-weight:700; color:white; font-size:0.7rem; cursor:pointer;">Copy</button>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <button id="lockout-btn-replenish" class="btn-primary btn-tactile">
+            Verify & Replenish Balance
+          </button>
+          <button id="lockout-btn-logout" class="btn-secondary btn-tactile">
+            Log Out
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==========================================
+       OVERLAY MODAL: 5-STAR RIDER RATING
+       ========================================== -->
+  <div id="rating-modal" class="lockout-overlay hidden" style="background: rgba(10, 10, 31, 0.85); z-index: 1001;">
+    <div class="glass-card glow-cyan" style="padding: 24px; max-width: 360px; width: 100%; text-align: center;">
+      <h3 style="color: var(--text-primary); font-size: 1.4rem; margin-bottom: 8px; letter-spacing: -0.02em;">RATE YOUR TRIP</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 24px;">Submit rating to unlock next dispatch runs.</p>
+      
+      <!-- Stars interactive block -->
+      <div id="stars-container" style="display: flex; justify-content: center; gap: 12px; margin-bottom: 24px;">
+        <svg class="star-svg btn-tactile" data-rating="1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width: 42px; height: 42px; cursor: pointer;">
+          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+        </svg>
+        <svg class="star-svg btn-tactile" data-rating="2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width: 42px; height: 42px; cursor: pointer;">
+          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+        </svg>
+        <svg class="star-svg btn-tactile" data-rating="3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width: 42px; height: 42px; cursor: pointer;">
+          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+        </svg>
+        <svg class="star-svg btn-tactile" data-rating="4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width: 42px; height: 42px; cursor: pointer;">
+          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+        </svg>
+        <svg class="star-svg btn-tactile" data-rating="5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width: 42px; height: 42px; cursor: pointer;">
+          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+        </svg>
+      </div>
+
+      <div class="input-group" style="margin-bottom: 20px; text-align: left;">
+        <label class="input-label" for="rating-comment" style="font-size: 0.75rem;">Review comments (optional)</label>
+        <textarea id="rating-comment" class="input-control" rows="3" style="resize:none; margin-top:6px; font-size:0.85rem; width:100%; border: 1px solid var(--border-light); border-radius: 8px; padding: 10px; background: var(--card-charcoal); color:white;" placeholder="Tell us about your ride..."></textarea>
+      </div>
+
+      <button id="btn-submit-rating" class="btn-primary btn-tactile" style="width: 100%;">
+        Submit Feedback
+      </button>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       OVERLAY MODAL: FINANCIAL TOP-UP UPI
+       ========================================== -->
+  <div id="topup-modal" class="lockout-overlay hidden" style="background: rgba(10, 10, 31, 0.85); z-index: 1001;">
+    <div class="glass-card glow-cyan" style="padding: 24px; max-width: 360px; width: 100%; text-align: center;">
+      <h3 style="color: var(--text-primary); font-size: 1.4rem; margin-bottom: 8px; letter-spacing: -0.02em;">TOP-UP WALLET</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px;">Pay via UPI to Admin to recharge wallet. Balance updates upon verification.</p>
+      
+      <div class="qr-code-placeholder" style="margin: 20px auto;">
+        <svg width="100%" height="100%" viewBox="0 0 100 100" fill="black" xmlns="http://www.w3.org/2000/svg">
+          <rect width="100" height="100" fill="white"/>
+          <rect x="10" y="10" width="25" height="25" fill="black"/>
+          <rect x="15" y="15" width="15" height="15" fill="white"/>
+          <rect x="18" y="18" width="9" height="9" fill="black"/>
+          <rect x="65" y="10" width="25" height="25" fill="black"/>
+          <rect x="70" y="15" width="15" height="15" fill="white"/>
+          <rect x="73" y="18" width="9" height="9" fill="black"/>
+          <rect x="10" y="65" width="25" height="25" fill="black"/>
+          <rect x="15" y="70" width="15" height="15" fill="white"/>
+          <rect x="18" y="73" width="9" height="9" fill="black"/>
+          <rect x="42" y="15" width="6" height="6" fill="black"/>
+          <rect x="52" y="25" width="6" height="6" fill="black"/>
+          <rect x="45" y="45" width="12" height="12" fill="black"/>
+          <rect x="15" y="45" width="6" height="8" fill="black"/>
+          <rect x="70" y="45" width="10" height="6" fill="black"/>
+          <rect x="42" y="65" width="6" height="10" fill="black"/>
+          <rect x="65" y="65" width="12" height="6" fill="black"/>
+          <rect x="78" y="75" width="8" height="8" fill="black"/>
+          <rect x="52" y="80" width="8" height="8" fill="black"/>
+        </svg>
+      </div>
+
+      <div style="font-size: 0.8rem; background: var(--card-charcoal); border: 1px solid var(--border-light); padding: 8px; border-radius: 8px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-family: monospace; color:white;">paytm.ryzo@paytm</span>
+        <button id="topup-btn-copy-upi" class="btn-tactile" style="background:var(--accent-cyan); border:none; padding:4px 8px; border-radius:4px; font-weight:700; color:white; font-size:0.7rem; cursor:pointer;">Copy</button>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <button id="topup-btn-verify" class="btn-primary btn-tactile">Verify Transaction</button>
+        <button id="topup-btn-close" class="btn-secondary btn-tactile">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       OVERLAY MODAL: CUSTOMER LOAD WALLET
+       ========================================== -->
+  <div id="load-wallet-modal" class="lockout-overlay hidden" style="background: rgba(10, 10, 31, 0.85); z-index: 1001;">
+    <div class="glass-card glow-cyan" style="padding: 24px; max-width: 360px; width: 100%; text-align: center;">
+      <h3 style="color: var(--text-primary); font-size: 1.4rem; margin-bottom: 8px; letter-spacing: -0.02em;">LOAD WALLET</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px;">Scan the UPI QR code below and pay the amount. Enter the amount paid below to submit a verification request.</p>
+      
+      <div class="qr-code-placeholder" style="margin: 20px auto;">
+        <svg width="100%" height="100%" viewBox="0 0 100 100" fill="black" xmlns="http://www.w3.org/2000/svg">
+          <rect width="100" height="100" fill="white"/>
+          <rect x="10" y="10" width="25" height="25" fill="black"/>
+          <rect x="15" y="15" width="15" height="15" fill="white"/>
+          <rect x="18" y="18" width="9" height="9" fill="black"/>
+          <rect x="65" y="10" width="25" height="25" fill="black"/>
+          <rect x="70" y="15" width="15" height="15" fill="white"/>
+          <rect x="73" y="18" width="9" height="9" fill="black"/>
+          <rect x="10" y="65" width="25" height="25" fill="black"/>
+          <rect x="15" y="70" width="15" height="15" fill="white"/>
+          <rect x="18" y="73" width="9" height="9" fill="black"/>
+          <rect x="42" y="15" width="6" height="6" fill="black"/>
+          <rect x="52" y="25" width="6" height="6" fill="black"/>
+          <rect x="45" y="45" width="12" height="12" fill="black"/>
+          <rect x="15" y="45" width="6" height="8" fill="black"/>
+          <rect x="70" y="45" width="10" height="6" fill="black"/>
+          <rect x="42" y="65" width="6" height="10" fill="black"/>
+          <rect x="65" y="65" width="12" height="6" fill="black"/>
+          <rect x="78" y="75" width="8" height="8" fill="black"/>
+          <rect x="52" y="80" width="8" height="8" fill="black"/>
+        </svg>
+      </div>
+
+      <div style="font-size: 0.8rem; background: var(--card-charcoal); border: 1px solid var(--border-light); padding: 8px; border-radius: 8px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-family: monospace; color:white;">paytm.ryzo@paytm</span>
+        <button id="load-wallet-btn-copy-upi" class="btn-tactile" onclick="navigator.clipboard.writeText('paytm.ryzo@paytm'); RyzoApp.showToast('Merchant UPI ID copied!')" style="background:var(--accent-cyan); border:none; padding:4px 8px; border-radius:4px; font-weight:700; color:white; font-size:0.7rem; cursor:pointer;">Copy</button>
+      </div>
+
+      <form id="load-wallet-form" onsubmit="event.preventDefault();" style="text-align: left; border-top: 1px dashed var(--border-light); padding-top: 16px;">
+        <div class="input-group">
+          <label class="input-label" for="load-wallet-amount" style="font-weight:600; font-size:0.75rem;">Amount Paid (₹)</label>
+          <input type="number" id="load-wallet-amount" class="input-control" placeholder="e.g. 150" min="1" style="background: var(--card-charcoal); color: white; border: 1px solid var(--border-light); border-radius: 8px; padding: 10px; width: 100%; margin-top: 6px;" required>
+        </div>
+        
+        <div class="input-group" style="margin-top: 12px;">
+          <label class="input-label" for="load-wallet-upi-id" style="font-weight:600; font-size:0.75rem;">UPI Transaction ID (UTR)</label>
+          <input type="text" id="load-wallet-upi-id" class="input-control" placeholder="12-digit UTR number" style="background: var(--card-charcoal); color: white; border: 1px solid var(--border-light); border-radius: 8px; padding: 10px; width: 100%; margin-top: 6px;" required>
+        </div>
+        
+        <div style="display:flex; gap:8px; margin-top: 20px;">
+          <button type="submit" id="load-wallet-btn-submit" onclick="RyzoApp.submitTopUpRequest()" class="btn-primary btn-tactile" style="flex:1; margin-top:0; padding: 10px;">Submit Request</button>
+          <button type="button" id="load-wallet-btn-close" onclick="RyzoApp.hideLoadWalletModal()" class="btn-secondary btn-tactile" style="flex:1; padding: 10px;">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+    <!-- ==========================================
+         VIEW 5: ADMIN DASHBOARD
+         ========================================== -->
+    <div id="view-admin" class="fade-in hidden" data-view="admin">
+      
+      <!-- Admin Sticky Header -->
+      <div class="header-bar">
+        <div style="display: flex; flex-direction: column;">
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Welcome, Administrator</span>
+          <span style="font-weight: 700; font-size: 0.95rem; color: var(--accent-cyan);">Ryzo Admin Panel</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <button id="admin-btn-logout" class="btn-tactile" style="background: none; border: none; cursor: pointer; color: var(--alert-magenta); font-size: 0.85rem; font-weight: 600; display:flex; align-items:center; gap:4px;">
+            Logout
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 16px; height: 16px;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div style="display: flex; gap: 8px; background: rgba(255, 255, 255, 0.02); padding: 4px; border-radius: 12px; margin: 16px 20px 0 20px; border: 1px solid var(--border-light);">
+        <button id="admin-tab-topups" class="btn-tactile" onclick="RyzoApp.switchAdminView('topups')" style="flex:1; background: var(--card-charcoal); border:none; padding:10px; border-radius:8px; color:white; font-weight:600; cursor:pointer;">Verifications</button>
+        <button id="admin-tab-tickets" class="btn-tactile" onclick="RyzoApp.switchAdminView('tickets')" style="flex:1; background: transparent; border:none; padding:10px; border-radius:8px; color:var(--text-muted); font-weight:600; cursor:pointer;">Support Tickets</button>
+      </div>
+
+      <div style="padding: 20px; padding-bottom: 40px;">
+        
+        <!-- Tab A: Top-Ups Verifications -->
+        <div id="admin-view-topups" class="fade-in">
+          <h3 style="font-size: 1rem; margin-bottom: 12px; color: var(--text-primary); display:flex; justify-content:space-between; align-items:center;">
+            <span>Pending Wallet Top-ups</span>
+            <span id="admin-pending-count" class="badge" style="background:rgba(255,255,255,0.03); border:1px solid var(--border-light); color:var(--text-muted);">0 Requests</span>
+          </h3>
+          <div id="admin-pending-list" class="fade-in">
+            <div id="admin-empty-state" class="glass-card" style="text-align:center; padding: 40px 20px;">
+              <p style="color:var(--text-muted); font-size: 0.85rem;">No pending wallet top-up requests.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab B: Support Tickets -->
+        <div id="admin-view-tickets" class="fade-in hidden">
+          <h3 style="font-size: 1rem; margin-bottom: 12px; color: var(--text-primary); display:flex; justify-content:space-between; align-items:center;">
+            <span>Support & Report Logs</span>
+            <span id="admin-tickets-count" class="badge" style="background:rgba(255,255,255,0.03); border:1px solid var(--border-light); color:var(--text-muted);">0 Tickets</span>
+          </h3>
+          <div id="admin-tickets-list" class="fade-in">
+            <div id="admin-tickets-empty" class="glass-card" style="text-align:center; padding: 40px 20px;">
+              <p style="color:var(--text-muted); font-size: 0.85rem;">No support tickets logged.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  <!-- ==========================================
+       OVERLAY MODAL: HELP MODULE (How can we help?)
+       ========================================== -->
+  <div id="help-modal" class="lockout-overlay hidden" style="background: rgba(10, 10, 31, 0.85); z-index: 1002;">
+    <div class="glass-card glow-cyan" style="padding: 24px; max-width: 380px; width: 100%; text-align: center; max-height: 90vh; overflow-y: auto;">
+      <h3 style="color: var(--text-primary); font-size: 1.4rem; margin-bottom: 8px; letter-spacing: -0.02em;">RYZO SUPPORT HUB</h3>
+      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">Support team typically responds within 24 hours. Please have your Order ID ready.</p>
+      
+      <!-- FAQ Section -->
+      <div style="text-align: left; margin-bottom: 20px; border-bottom: 1px dashed var(--border-light); padding-bottom: 16px;">
+        <h4 style="font-size: 0.85rem; color: var(--accent-cyan); margin-bottom: 8px; text-transform: uppercase;">Quick Help FAQ</h4>
+        
+        <details style="margin-bottom: 8px; cursor: pointer;">
+          <summary style="font-size: 0.8rem; font-weight: bold; color: white;">How to verify a payment?</summary>
+          <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; padding-left: 8px;">Scan the merchant QR code, enter the payment amount and the 12-digit UTR transaction ID in the Load Wallet form. Admin will verify and approve your request shortly.</p>
+        </details>
+        
+        <details style="margin-bottom: 8px; cursor: pointer;">
+          <summary style="font-size: 0.8rem; font-weight: bold; color: white;">How to resolve an OTP issue?</summary>
+          <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; padding-left: 8px;">The OTP is generated securely on the server upon booking. The rider must enter this exact 4-digit code to start or complete the trip. If it fails, check that both devices are online.</p>
+        </details>
+        
+        <details style="margin-bottom: 8px; cursor: pointer;">
+          <summary style="font-size: 0.8rem; font-weight: bold; color: white;">What happens if I cancel?</summary>
+          <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; padding-left: 8px;">Cancelling a ride after acceptance assigns a strike to the customer. Reaching 3 strikes results in temporary account suspension to keep the platform fair.</p>
+        </details>
+      </div>
+
+      <!-- Email Support Action Trigger -->
+      <button onclick="RyzoApp.contactSupport('General Support')" class="btn-primary btn-tactile" style="display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; font-weight: 700; border-radius: 8px; margin-bottom: 16px; width: 100%; font-size: 0.9rem; color: white; background: rgba(0, 240, 255, 0.15); border: 1px solid var(--accent-cyan); cursor: pointer;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+        </svg>
+        Email: supportcareryzo@gmail.com
+      </button>
+
+      <!-- In-App Support Ticket Form -->
+      <form id="help-support-form" onsubmit="event.preventDefault();" style="text-align: left; border-top: 1px dashed var(--border-light); padding-top: 16px;">
+        <label class="input-label" for="help-issue-category" style="font-weight:600; font-size:0.75rem;">Issue Category</label>
+        <select id="help-issue-category" class="input-control" style="margin-top: 6px; font-size: 0.85rem; background: var(--card-charcoal); color: white; border: 1px solid var(--border-light); border-radius: 8px; padding: 10px; width: 100%;">
+          <option value="wallet">Wallet & Payments</option>
+          <option value="ride">Ride Issues</option>
+          <option value="other">Other Concerns</option>
+        </select>
+        
+        <div style="margin-top: 12px;">
+          <label class="input-label" for="help-issue-message" style="font-weight:600; font-size:0.75rem;">Describe your problem</label>
+          <textarea id="help-issue-message" class="input-control" rows="3" style="resize:none; margin-top:6px; font-size:0.85rem; width:100%; border: 1px solid var(--border-light); border-radius: 8px; padding: 10px; background: var(--card-charcoal); color:white;" placeholder="Tell us what went wrong..." required></textarea>
+        </div>
+        
+        <div style="display:flex; gap:8px; margin-top: 20px;">
+          <button type="submit" id="help-btn-submit" onclick="RyzoApp.submitSupportTicket()" class="btn-primary btn-tactile" style="flex:1; margin-top:0; padding: 10px;">Submit Ticket</button>
+          <button type="button" id="help-btn-close" onclick="RyzoApp.hideHelpModal()" class="btn-secondary btn-tactile" style="flex:1; padding: 10px;">Close</button>
+        </div>
+      </form>
+      <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 12px;">Support: supportcareryzo@gmail.com</div>
+    </div>
+  </div>
+
+  <!-- Main Application Script -->
+  <script src="supabase.js" type="module"></script>
+  <script src="app.js" type="module"></script>
+</body>
+</html>
